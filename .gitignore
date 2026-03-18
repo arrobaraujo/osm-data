@@ -1,0 +1,28 @@
+# R session files
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+
+# RStudio files
+.Rproj.user/
+
+# Project-local environment files
+.Renviron
+.Renviron.site
+
+# Package/library caches
+renv/library/
+renv/python/
+
+# Temporary files
+*.Rtmp
+*.tmp
+*.bak
+*.swp
+*~
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
