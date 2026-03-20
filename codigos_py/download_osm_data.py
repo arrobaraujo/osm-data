@@ -49,7 +49,7 @@ def get_predefined_tags(category):
                     all_tags[k] = v
         return all_tags
     
-    return categories.get(category, categories["all"])
+    return categories.get(category, {})
 
 def download_osm_transport_data(place_name, output_base, category="all", custom_tags=None):
     """

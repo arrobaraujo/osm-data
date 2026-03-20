@@ -6,8 +6,8 @@ Este projeto fornece um script Python para baixar dados de transporte e mobilida
 
 ### [codigos_py](file:///c:/R_SMTR/projetos/import_osm/codigos_py)
 
-#### [download_osm_transport_data.py](file:///c:/R_SMTR/projetos/import_osm/codigos_py/download_osm_transport_data.py)
-Script atualizado para baixar **pontos de parada**, **rotas** (ônibus, trem, metrô, VLT), **corredores de ônibus/BRT** (`busway`, faixas exclusivas) e toda a **infraestrutura cicloviária** (ciclovias, ciclofaixas e ciclorotas).
+#### [gui_download_osm.py](file:///c:/R_SMTR/projetos/import_osm/codigos_py/gui_download_osm.py)
+Interface visual (GUI) construída com `tkinter`. Ela permite configurar o local, escolher a pasta de salvamento via botão **"Procurar..."** e selecionar a categoria de dados através de uma janela amigável.
 
 Exporta os dados em três formatos:
 1. **GeoJSON**: Formato padrão para sistemas web e GIS, preserva todas as geometrias (Pontos e Linhas).
@@ -24,7 +24,17 @@ pip install -r requirements.txt
 
 ## Como utilizar
 
-O script aceita vários parâmetros para facilitar o download de diferentes tipos de dados e para diferentes locais.
+O projeto agora oferece duas maneiras de baixar os dados: via **Interface Visual (GUI)** ou via **Linheiro de Comando (Terminal)**.
+
+### 1. Utilizando a Interface Visual (Mais fácil)
+Para abrir a janela do programa, execute:
+```bash
+python codigos_py/gui_download_osm.py
+```
+Preencha o local, o nome do arquivo, escolha a categoria e clique em "BAIXAR DADOS OSM".
+
+### 2. Utilizando o Terminal (Avançado)
+O script aceita vários parâmetros para facilitar o download automatizado.
 
 ### 1. Especificando o Local
 Use `--place` para definir a cidade ou bairro (padrão: "Rio de Janeiro"):

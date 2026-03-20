@@ -32,3 +32,5 @@ __pycache__/
 
 osm_data/
 DESCRICAO_CODIGOS.md
+.venv/
+cache/
