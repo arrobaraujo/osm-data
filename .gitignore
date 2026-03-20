@@ -26,3 +26,9 @@ renv/python/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Python cache
+__pycache__/
+
+osm_data/
+DESCRICAO_CODIGOS.md
