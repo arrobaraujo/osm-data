@@ -4,6 +4,8 @@ import pandas as pd
 import argparse
 import os
 import json
+import requests
+from shapely.geometry import LineString, MultiLineString, Point, shape
 
 def get_predefined_tags(category):
     """
@@ -19,6 +21,8 @@ def get_predefined_tags(category):
         },
         "routes": {
             "route": ["bus", "train", "subway", "light_rail", "tram", "ferry"],
+            "route_master": ["bus", "train", "subway", "light_rail", "tram", "ferry"],
+            "type": ["route", "route_master"],
         },
         "cycling": {
             "highway": ["cycleway"],
@@ -67,8 +71,89 @@ def download_osm_transport_data(place_name, output_base, category="all", custom_
     
     print(f"Buscando dados ({category}) para: {place_name}...")
     try:
-        # Download features using osmnx
-        gdf = ox.features_from_place(place_name, tags=tags)
+        # Verifica se estamos baixando rotas para usar uma query mais robusta que pegue relações
+        if category == "routes" or (isinstance(tags, dict) and tags.get("type") == ["route", "route_master"]):
+            print(f"Utilizando modo de recuperação de relações para rotas...")
+            
+            # Obtém a geometria da área para filtrar a query
+            area_gdf = ox.geocode_to_gdf(place_name)
+            if area_gdf.empty:
+                raise ValueError(f"Não foi possível geocodificar o local: {place_name}")
+            
+            # Constrói query Overpass customizada com 'out geom' para pegar geometrias de relações
+            # Filtramos por rotas de transporte público (route ou route_master)
+            tag_values = "|".join(tags.get("route", ["bus", "train", "subway", "light_rail", "tram", "ferry"]))
+            
+            # Obtém os limites da área (bounding box)
+            bounds = area_gdf.total_bounds # [minx, miny, maxx, maxy]
+            
+            # Query que busca tanto 'route' quanto 'route_master'
+            overpass_query = f"""
+            [out:json][timeout:90];
+            (
+              relation["route"~"{tag_values}"]({bounds[1]},{bounds[0]},{bounds[3]},{bounds[2]});
+              relation["route_master"~"{tag_values}"]({bounds[1]},{bounds[0]},{bounds[3]},{bounds[2]});
+            );
+            out geom;
+            """
+            
+            # Faz a requisição bruta usando requests
+            # Usamos o endpoint de ox.settings.overpass_url ou o padrão
+            url = f"{ox.settings.overpass_url.rstrip('/')}/interpreter"
+            print(f"Enviando consulta para {url}...")
+            
+            headers = {'User-Agent': ox.settings.http_user_agent}
+            response = requests.post(url, data={'data': overpass_query}, headers=headers, timeout=120)
+            
+            data = response.json()
+            elements = data.get('elements', [])
+            print(f"Overpass retornou {len(elements)} elementos.")
+            
+            features = []
+            for el in elements:
+                tags = el.get('tags', {})
+                geom = None
+                
+                if el.get('type') == 'relation' and 'members' in el:
+                    # Reconstrói a rota a partir dos membros que tenham geometria (out geom)
+                    lines = []
+                    for member in el['members']:
+                        if 'geometry' in member and len(member['geometry']) >= 2:
+                            coords = [(m['lon'], m['lat']) for m in member['geometry']]
+                            lines.append(LineString(coords))
+                    
+                    if lines:
+                        geom = MultiLineString(lines)
+                
+                elif el.get('type') == 'way' and 'geometry' in el:
+                    coords = [(m['lon'], m['lat']) for m in el['geometry']]
+                    if len(coords) >= 2:
+                        geom = LineString(coords)
+                
+                elif el.get('type') == 'node' and 'lat' in el and 'lon' in el:
+                    geom = Point(el['lon'], el['lat'])
+                
+                if geom:
+                    feat_data = {
+                        'osmid': el.get('id'),
+                        'element_type': el.get('type'),
+                        'geometry': geom
+                    }
+                    feat_data.update(tags)
+                    features.append(feat_data)
+            
+            if not features:
+                print("Nenhum elemento com geometria foi encontrado nos dados retornados.")
+                return
+                
+            gdf = gpd.GeoDataFrame(features, crs="EPSG:4326")
+            
+            # Filtro espacial manual para garantir que estamos dentro da área (opcional, mas recomendado)
+            # gdf = gdf[gdf.intersects(area_gdf.geometry.iloc[0])]
+            
+        else:
+            # Download features usando o método padrão do osmnx
+            gdf = ox.features_from_place(place_name, tags=tags)
         
         if gdf.empty:
             print(f"Nenhum dado encontrado para '{place_name}' com os filtros fornecidos.")
@@ -102,6 +187,11 @@ def download_osm_transport_data(place_name, output_base, category="all", custom_
             if is_point.any():
                 df_csv.loc[is_point, 'latitude'] = df_csv.loc[is_point].geometry.y
                 df_csv.loc[is_point, 'longitude'] = df_csv.loc[is_point].geometry.x
+            
+            # Adiciona WKT para geometrias não-pontuais
+            is_not_point = ~is_point
+            if is_not_point.any():
+                df_csv.loc[is_not_point, 'wkt_geometry'] = df_csv.loc[is_not_point].geometry.apply(lambda g: g.wkt)
             
             # Remove coluna geometry para o CSV básico
             df_csv = pd.DataFrame(df_csv.drop(columns='geometry'))
